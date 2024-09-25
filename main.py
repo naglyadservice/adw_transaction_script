@@ -70,10 +70,7 @@ async def process_data(code: int) -> None:
 async def main_loop():
     code = 1
     while True:
-        print(f"Running script at {datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}")
         code = await process_data(code)
-        print("Waiting 1 min...")
-        await asyncio.sleep(60)
 
 
 
