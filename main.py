@@ -12,7 +12,7 @@ load_dotenv()
 
 
 async def send_data_to_server(data: dict) -> str:
-    uri = "ws://localhost:8765"
+    uri = "ws://nv9.in.net:4715"
     async with websockets.connect(uri) as ws:
         await ws.send(json.dumps(data))
         response = await ws.recv()
