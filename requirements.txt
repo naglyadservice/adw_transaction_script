@@ -1,2 +1,2 @@
 aiomysql==0.2.0
-websockets==13.1
+websockets==11.0.3
