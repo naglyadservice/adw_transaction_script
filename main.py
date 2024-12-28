@@ -33,7 +33,7 @@ async def process_data(conn, cur) -> int:
           AND value > 0
           AND id NOT IN (SELECT id FROM fiscalized)
           AND service_id = 14
-          AND last_update > NOW() - INTERVAL '{INTERVAL_HOURS} HOUR'
+          AND last_update > NOW() - INTERVAL {INTERVAL_HOURS} HOUR
         """
     )
     result = await cur.fetchall()
@@ -63,8 +63,6 @@ async def process_data(conn, cur) -> int:
 
         code += 1
         await asyncio.sleep(2)
-
-    return code
 
 
 async def main_loop():
