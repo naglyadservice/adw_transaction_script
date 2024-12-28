@@ -15,10 +15,13 @@ INTERVAL_HOURS = os.getenv("INTERVAL_HOURS")
 WS_SERVER = os.getenv("WS_SERVER")
 
 async def send_data_to_server(data: dict) -> str:
-    async with websockets.connect(WS_SERVER) as ws:
-        await ws.send(json.dumps(data))
-        response = await ws.recv()
-        return response
+    try:
+        async with websockets.connect(WS_SERVER) as ws:
+            await ws.send(json.dumps(data))
+            response = await ws.recv()
+            return response
+    except websockets.exceptions.ConnectionClosedOK:
+        pass
 
 
 async def process_data(conn, cur) -> int:
@@ -76,9 +79,6 @@ async def main_loop():
     ) as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             while True:
-                try:
-                    await process_data(conn, cur)
-                except websockets.exceptions.ConnectionClosedOK:
-                    pass
+                await process_data(conn, cur)
 
 asyncio.run(main_loop())
