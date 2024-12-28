@@ -24,7 +24,7 @@ async def send_data_to_server(data: dict) -> str:
         pass
 
 
-async def process_data(conn, cur) -> int:
+async def process_data(conn, cur):
     await cur.execute(
         f"""
         SELECT id, carwash_id, post_id, payment_type, value
@@ -60,8 +60,6 @@ async def process_data(conn, cur) -> int:
             (row["id"], factory_number, row["payment_type"], row["value"], now, True)
         )
         await conn.commit()
-
-        code += 1
         await asyncio.sleep(2)
 
 
