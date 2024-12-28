@@ -7,37 +7,42 @@ from datetime import datetime
 import aiomysql
 import websockets
 from dotenv import load_dotenv
+import websockets.exceptions
 
 load_dotenv()
 
+INTERVAL_HOURS = os.getenv("INTERVAL_HOURS")
+WS_SERVER = os.getenv("WS_SERVER")
 
 async def send_data_to_server(data: dict) -> str:
-    uri = "ws://nv9.in.net:4715"
-    async with websockets.connect(uri) as ws:
+    async with websockets.connect(WS_SERVER) as ws:
         await ws.send(json.dumps(data))
         response = await ws.recv()
         return response
 
 
-async def process_data(code: int, conn, cur) -> int:
+async def process_data(conn, cur) -> int:
     await cur.execute(
-        """
+        f"""
         SELECT id, carwash_id, post_id, payment_type, value
         FROM transactions
-        WHERE payment_type IN ('cash', 'paypass')
+        WHERE payment_type IN ('cash', 'paypass', 'liqpay')
           AND value > 0
           AND id NOT IN (SELECT id FROM fiscalized)
+          AND service_id = 14
+          AND last_update > NOW() - INTERVAL '{INTERVAL_HOURS} HOURS'
         """
     )
     result = await cur.fetchall()
 
     for row in result:
         now = datetime.now()
+        factory_number = "ADW" + str(row["carwash_id"]) + str(row["post_id"])
+        
         response = await send_data_to_server({
-            # "factory_number": "ADW" + str(row["carwash_id"]) + str(row["post_id"]),
-            "factory_number": "NPF010020",
+            "factory_number": factory_number,
             "sales": {
-                "code": code,
+                "code": row["id"],
                 row["payment_type"]: row["value"],
                 "created_at": now.strftime("%Y-%m-%dT%H:%M:%S")
             }
@@ -49,7 +54,7 @@ async def process_data(code: int, conn, cur) -> int:
             INSERT INTO fiscalized (id, serial, type, value, date, is_handled)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (row["id"], "NPF010020", row["payment_type"], row["value"], now, True)
+            (row["id"], factory_number, row["payment_type"], row["value"], now, True)
         )
         await conn.commit()
 
@@ -71,7 +76,9 @@ async def main_loop():
     ) as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             while True:
-                code = await process_data(code, conn, cur)
-
+                try:
+                    await process_data(conn, cur)
+                except websockets.exceptions.ConnectionClosedOK:
+                    pass
 
 asyncio.run(main_loop())
