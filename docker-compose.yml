@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  script:
+    container_name: fiscalization
+    build: .
+    ports:
+      - '4715:4715'
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
