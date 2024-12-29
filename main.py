@@ -68,7 +68,7 @@ async def process_data(pool):
 
 async def main_loop():
     logging.basicConfig(level=logging.INFO)
-    pool = aiomysql.create_pool(
+    pool = await aiomysql.create_pool(
         host=os.getenv("DB_HOST"),
         port=int(os.getenv("DB_PORT")),
         user=os.getenv("DB_USER"),
