@@ -26,7 +26,7 @@ async def send_data_to_server(data: dict) -> str:
         logging.error(f"WebSocket error: {e}")
 
 
-async def process_data(pool):
+async def process_data(pool) -> None:
     async with pool.acquire() as conn, conn.cursor(aiomysql.DictCursor) as cur:
         await cur.execute(
             f"""
@@ -75,6 +75,7 @@ async def main_loop():
         password=os.getenv("DB_PASSWORD"),
         db=os.getenv("DB_NAME"),
     )
+    logging.info("Script has started")
     while True:
         try:
             await process_data(pool)
