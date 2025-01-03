@@ -11,7 +11,7 @@ import websockets.exceptions
 
 load_dotenv()
 
-INTERVAL_HOURS = os.getenv("INTERVAL_HOURS")
+
 WS_SERVER = os.getenv("WS_SERVER")
 
 async def send_data_to_server(data: dict) -> str:
