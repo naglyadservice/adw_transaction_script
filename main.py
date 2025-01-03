@@ -28,42 +28,50 @@ async def send_data_to_server(data: dict) -> str:
 
 async def process_data(pool) -> None:
     async with pool.acquire() as conn, conn.cursor(aiomysql.DictCursor) as cur:
-        await cur.execute(
-            f"""
-            SELECT id, carwash_id, post_id, payment_type, value
-            FROM transactions
-            WHERE payment_type IN ('cash', 'paypass', 'liqpay')
-            AND value > 0
-            AND id NOT IN (SELECT id FROM fiscalized)
-            AND service_id = 14
-            AND last_update > NOW() - INTERVAL {INTERVAL_HOURS} HOUR
-            """
-        )
-        result = await cur.fetchall()
-
-        for row in result:
-            now = datetime.now()
-            factory_number = "ADW" + str(row["carwash_id"]) + str(row["post_id"])
-            
-            response = await send_data_to_server({
-                "factory_number": factory_number,
-                "sales": {
-                    "code": row["id"],
-                    row["payment_type"]: row["value"],
-                    "created_at": now.strftime("%Y-%m-%dT%H:%M:%S")
-                }
-            })
-            if response:
-                logging.info(f"Response for transaction_id={row['id']}: {response}")
-
+        try:
             await cur.execute(
+                f"""
+                SELECT id, carwash_id, post_id, payment_type, value, last_update
+                FROM transactions
+                WHERE payment_type IN ('cash','paypass','liqpay')
+                AND value > 0
+                AND id NOT IN (SELECT id FROM fiscalized)
+                AND service_id = 14
                 """
-                INSERT INTO fiscalized (id, serial, type, value, date, is_handled)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (row["id"], factory_number, row["payment_type"], row["value"], now, True)
             )
-            await conn.commit()
+            result = await cur.fetchall()
+            logging.info(f"Fetched rows: {result}")
+
+            if not result:
+                logging.info("No new transactions found")
+                return
+
+            for row in result:
+                now = datetime.now()
+                factory_number = "ADW" + str(row["carwash_id"]) + str(row["post_id"])
+                response = await send_data_to_server({
+                    "factory_number": factory_number,
+                    "sales": {
+                        "code": row["id"],
+                        "payment_type": row["payment_type"],
+                        "cash": row["value"],
+                        "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
+                    }
+                })
+                if response:
+                    logging.info(f"Response for transaction_id={row['id']}: {response}")
+                    await cur.execute(
+                        """
+                        INSERT INTO fiscalized (id, serial, type, value, date, is_handled)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (row["id"], factory_number, row["payment_type"], row["value"], now, True)
+                    )
+                    await conn.commit()
+                else:
+                    logging.warning(f"Failed to process transaction_id={row['id']}, will retry later.")
+        except Exception as e:
+            logging.error(f"Error processing data: {e}")
 
 
 async def main_loop():
@@ -74,6 +82,7 @@ async def main_loop():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
         db=os.getenv("DB_NAME"),
+        autocommit=True,
     )
     logging.info("Script has started")
     while True:
@@ -82,7 +91,7 @@ async def main_loop():
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
             
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
 
 
 asyncio.run(main_loop())
